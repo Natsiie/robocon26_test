@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 import os
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
 import open3d as o3d
 from pcl_msgs.msg import PointIndices  # 不需要，但保留兼容
-import numpy as np
-import struct
 from ament_index_python.packages import get_package_share_directory
 
 

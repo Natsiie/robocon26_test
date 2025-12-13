@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
+import os
+import re
+import open3d as o3d
+import numpy as np
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from ament_index_python.packages import get_package_share_directory
-import open3d as o3d
-import numpy as np
-import os
-import re
 
 
 class SavePCDNode(Node):

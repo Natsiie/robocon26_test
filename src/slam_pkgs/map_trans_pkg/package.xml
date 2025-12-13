@@ -32,6 +32,8 @@
 
   <!-- Python 依赖 -->
   <depend>rclpy</depend>
+  <exec_depend>python3-pil</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
   
   <!-- 执行依赖 -->
   <exec_depend>ros2launch</exec_depend>

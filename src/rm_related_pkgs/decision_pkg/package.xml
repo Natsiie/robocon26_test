@@ -22,10 +22,6 @@
   <!-- Python相关依赖 -->
   <depend>rclpy</depend>
 
-  <!-- 其他可能需要的依赖 -->
-  <depend>nav_msgs</depend>
-  <depend>sensor_msgs</depend>
-
   <exec_depend>ros2launch</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>

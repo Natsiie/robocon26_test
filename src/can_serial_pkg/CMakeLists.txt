@@ -27,8 +27,17 @@ ament_target_dependencies(can_serial_node
   rclcpp
   can_msgs)
 
+# 添加middle_coding_node可执行文件
+add_executable(middle_coding_node src/middle_coding_node.cpp)
+
+ament_target_dependencies(middle_coding_node
+  rclcpp
+  can_msgs
+  geometry_msgs)
+
 install(TARGETS
   can_serial_node
+  middle_coding_node
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY

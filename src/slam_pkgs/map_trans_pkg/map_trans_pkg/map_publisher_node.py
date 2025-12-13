@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
+import yaml
+import numpy as np
+from PIL import Image
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import OccupancyGrid
 from pathlib import Path
-import yaml
-import numpy as np
-from PIL import Image
 from ament_index_python.packages import get_package_share_directory
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 

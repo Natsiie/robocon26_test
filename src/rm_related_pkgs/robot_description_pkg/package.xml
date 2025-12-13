@@ -9,23 +9,16 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- 核心依赖 -->
-  <depend>rclcpp</depend>
-  <depend>std_msgs</depend>
-  <depend>geometry_msgs</depend>
-  
   <!-- URDF和TF相关依赖 -->
   <depend>urdf</depend>
   <depend>robot_state_publisher</depend>
   <depend>joint_state_publisher</depend>
-  <depend>joint_state_publisher_gui</depend>
   <depend>tf2_ros</depend>
   <depend>tf2_geometry_msgs</depend>
-  
+
   <!-- 可视化依赖 -->
-  <depend>rviz2</depend>
   <depend>xacro</depend>
-  
+
   <!-- 启动文件依赖 -->
   <depend>launch</depend>
   <depend>launch_ros</depend>
