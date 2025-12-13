@@ -102,9 +102,9 @@ def classify_grid_fast(elv_grid, passable_thresh, kernel=5):
 
 if __name__ == "__main__":
     root = os.path.join(os.path.dirname(__file__), "../../../r2n_bringup_pkg")
-    pcd_file = f"{root}/pcds/sim_map.pcd"
-    pgm_file = f"{root}/maps/scans.pgm"
-    yaml_file = f"{root}/maps/scans.yaml"
+    pcd_file = f"{root}/pcds/test.pcd"
+    pgm_file = f"{root}/maps/test.pgm"
+    yaml_file = f"{root}/maps/test.yaml"
 
     target_resolution = 0.10  
     ELV_TO_PGM_RATIO = 2.0 

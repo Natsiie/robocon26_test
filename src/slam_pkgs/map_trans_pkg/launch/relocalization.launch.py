@@ -1,24 +1,55 @@
+import os
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
+    r2n_bringup_pkg_share = get_package_share_directory("r2n_bringup_pkg")
+    pcd_file_path = os.path.join(r2n_bringup_pkg_share, "pcds", "test.pcd")
+    
+    # Get package directories for the additional launch files
+    fast_lio_pkg_dir = get_package_share_directory('fast_lio')
+    livox_driver_pkg_dir = get_package_share_directory('livox_ros_driver2')
+    
     return LaunchDescription(
         [
+            # Include Fast-LIO mapping launch file
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(fast_lio_pkg_dir, 'launch', 'mapping.launch.py')
+                )
+            ),
+            
+            # Include Livox ROS Driver2 Mid360 launch file
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(livox_driver_pkg_dir, 'launch_ROS2', 'msg_MID360_launch.py')
+                )
+            ),
+            
+            # Relocalization node
             Node(
                 package="map_trans_pkg",
                 executable="relocalization_node",
                 name="relocalization_node",
                 output="screen",
+            ),
+            
+            # PCD publisher node
+            Node(
+                package="map_trans_pkg",
+                executable="pcd_publisher_node",  # python 节点编译后通常为此名（或 pcd_publisher_node）
+                name="pcd_publisher",
+                output="screen",
                 parameters=[
                     {
-                        "map_voxel_size": 0.3,  # 全局地图体素降采样尺寸（米）
-                        "scan_voxel_size": 0.1,  # 当前扫描体素降采样尺寸（米）
-                        "localization_freq": 1.0,  # 定位频率（Hz）
-                        "localization_threshold": 0.8,  # ICP 配准成功阈值（fitness score）
-                        "fov": 6.28318530718,  # 视野角度（弧度），默认 2π（360°）
-                        "fov_far": 30.0,  # 视野最大距离（米）
-                        "tf_pub_freq": 50.0,  # TF 广播频率（Hz）
+                        "pcd_path": pcd_file_path,
+                        "publish_topic": "/map3d",  # 关键：改为 relocalization_node 订阅的 /map3d
+                        "frame_id": "map",
+                        "publish_interval": 20.0,
                     }
                 ],
             )

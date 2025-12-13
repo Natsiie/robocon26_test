@@ -23,8 +23,8 @@ public:
         // 参数
         declare_parameter("pc_topic", "/livox/lidar_pc2");
         declare_parameter("laserscan_topic", "/scan");
-        declare_parameter("lidar_frame", "robot_lidar");
-        declare_parameter("base_frame", "base_link");
+        declare_parameter("lidar_frame", "livox_frame");
+        declare_parameter("base_frame", "body");
         declare_parameter("output_frame", "body");
         declare_parameter("min_height", -0.2);
         declare_parameter("max_height", 0.2);

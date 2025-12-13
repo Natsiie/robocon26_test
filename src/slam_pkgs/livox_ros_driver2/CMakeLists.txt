@@ -33,6 +33,7 @@ add_definitions(-DBUILDING_ROS2)
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 find_package(PCL REQUIRED)
+find_package(pcl_conversions REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
@@ -129,3 +130,4 @@ ament_auto_package(INSTALL_TO_SHARE
   config
   launch
 )
+
