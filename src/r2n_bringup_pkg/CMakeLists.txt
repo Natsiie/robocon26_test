@@ -1,0 +1,37 @@
+cmake_minimum_required(VERSION 3.5)
+project(r2n_bringup_pkg)
+
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+
+# Install launch files
+install(DIRECTORY
+  launch
+  maps
+  pcds
+  params
+  rviz
+  DESTINATION share/${PROJECT_NAME}/
+)
+
+
+# 安装Python模块
+ament_python_install_package(${PROJECT_NAME})
+
+install(PROGRAMS
+  r2n_bringup_pkg/sim_odom_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME sim_odom_publisher
+)
+# Export dependencies
+ament_package()

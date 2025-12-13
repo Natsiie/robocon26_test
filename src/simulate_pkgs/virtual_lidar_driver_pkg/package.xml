@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>virtual_lidar_driver_pkg</name>
+  <version>0.0.1</version>
+  <description>Virtual Lidar driver simulator - pointcloud and imu generator</description>
+  <maintainer email="you@example.com">You</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_eigen</depend>
+  <depend>pcl_conversions</depend>
+  <depend>pcl_ros</depend>
+  <depend>pcl_msgs</depend>
+  <depend>eigen3_cmake_module</depend>
+  <depend>livox_ros_driver2</depend>
+
+
+  <build_depend>PCL</build_depend>
+  <exec_depend>pcl-tools</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

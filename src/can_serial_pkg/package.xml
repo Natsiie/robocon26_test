@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>can_serial_pkg</name>
+  <version>0.0.1</version>
+  <description>CAN Serial Communication Package using libserialport</description>
+  <maintainer email="you@example.com">Your Name</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>can_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

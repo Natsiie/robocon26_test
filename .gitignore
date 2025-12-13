@@ -1,0 +1,9 @@
+*.pcd
+*.pgm
+
+build
+install
+log
+
+__pycache__
+.vscode

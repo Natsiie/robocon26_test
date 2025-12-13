@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>map_trans_pkg</name>
+  <version>0.0.1</version>
+  <description>Map Transformation Package</description>
+  <maintainer email="maintainer@example.com">Maintainer Name</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+  <!-- C++ 依赖 -->
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>laser_geometry</depend>
+  <depend>pcl_conversions</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_sensor_msgs</depend>
+  <depend>tf2_geometry_msgs</depend>
+  
+  <!-- PCL 依赖 -->
+  <depend>libpcl-all-dev</depend>
+  
+  <!-- OpenCV 依赖 -->
+  <depend>libopencv-dev</depend>
+
+  <!-- open3d 依赖 -->
+  <depend>open3d</depend>
+
+  <!-- Python 依赖 -->
+  <depend>rclpy</depend>
+  
+  <!-- 执行依赖 -->
+  <exec_depend>ros2launch</exec_depend>
+
+  <!-- 测试依赖 -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

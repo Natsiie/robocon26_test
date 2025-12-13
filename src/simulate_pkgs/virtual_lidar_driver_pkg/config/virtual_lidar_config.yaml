@@ -1,0 +1,28 @@
+virtual_lidar_driver_node:
+  ros__parameters:
+    world_frame_id: "world"
+    lidar_frame_id: "robot_lidar" # 支持tf中任意安装（倾斜/倒置）
+    imu_topic: "/livox/imu" # Mid-360-like topic
+    lidar_topic: "/livox/lidar_pc2"
+    imu_update_rate: 50.0 # Mid-360 IMU默认率（若启用独立定时器）
+    lidar_update_rate: 10.0
+    pcd_path: "$(find r2n_bringup_pkg)/pcds/sim_map.pcd"
+    advanced_mode: true
+    pixel_per_deg: 1
+    downsample: true
+    lidar_downsample_voxel_size: 0.05
+    points_noise_stderr: 0.01
+
+    fov:
+      dist_min: 0.2 # Mid-360 min range
+      dist_max: 5.0 # Mid-360 max @80% refl.
+      yaw_min_deg: -180.0
+      yaw_max_deg: 180.0
+      pitch_max_deg: 40.0 # Mid-360 vertical max
+      pitch_min_deg: -40.0 # Mid-360 vertical min
+
+    imu:
+      with_3dof_model: false # 全6DoF for Mid-360
+      acc_cov: 0.0005 # ~0.02 m/s² RMS, Mid-360-like (ICM-40609)
+      gyro_cov: 0.00001 # ~0.1 °/s RMS, Mid-360-like
+      gravity_vector: [0.0, 0.0, -9.81]
