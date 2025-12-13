@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(map_trans_pkg)
 
 # 设置C++标准
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # 禁用PCL的预编译头以减少警告

@@ -49,7 +49,7 @@ private:
         // 将编码后的数据填充到CAN消息中
         // 注意：这里按照结构体内存布局进行复制
         uint8_t* data_ptr = reinterpret_cast<uint8_t*>(&encoded_data);
-        for (int i = 0; i < 8 && i < sizeof(down_ward_data); i++) {
+        for (int i = 0; i < 8 && (size_t)i < sizeof(down_ward_data); i++) {
             can_frame_msg.data[i] = data_ptr[i];
         }
         

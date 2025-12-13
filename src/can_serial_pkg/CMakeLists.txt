@@ -8,6 +8,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(can_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 # 查找 libserialport（系统库）
 find_package(PkgConfig REQUIRED)
@@ -26,6 +27,11 @@ target_link_libraries(can_serial_node
 ament_target_dependencies(can_serial_node
   rclcpp
   can_msgs)
+
+
+include_directories(
+  include
+)
 
 # 添加middle_coding_node可执行文件
 add_executable(middle_coding_node src/middle_coding_node.cpp)
