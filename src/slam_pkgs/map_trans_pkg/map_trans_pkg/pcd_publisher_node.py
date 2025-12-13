@@ -13,19 +13,20 @@ from ament_index_python.packages import get_package_share_directory
 def o3d_to_ros(
     o3d_pc: o3d.geometry.PointCloud, frame_id: str, stamp=None
 ) -> PointCloud2:
-    """
-    将 Open3D PointCloud 转换为 sensor_msgs/PointCloud2
-    只支持 XYZ（float32），不带颜色/强度
-    """
     import sensor_msgs_py.point_cloud2 as pc2
+    from std_msgs.msg import Header
 
     points = np.asarray(o3d_pc.points, dtype=np.float32)
     if points.size == 0:
         raise ValueError("Point cloud is empty!")
 
-    header = rclpy.clock.Clock().now().to_msg()
+    header = Header()
     if stamp is not None:
         header.stamp = stamp
+    else:
+        # 注意：这里 stamp 留空，由调用方在节点内填充当前时间
+        header.stamp.sec = 0
+        header.stamp.nanosec = 0
     header.frame_id = frame_id
 
     fields = [
@@ -100,15 +101,19 @@ class PCDPublisherNode(Node):
 
         self.timer = self.create_timer(period, self.timer_callback)
 
-        # 首次立即发布一次
-        self.timer_callback()
-
     def timer_callback(self):
-        msg = o3d_to_ros(o3d.io.read_point_cloud(self.pcd_path), self.frame_id)
+        o3d_cloud = o3d.io.read_point_cloud(self.pcd_path)
+        if o3d_cloud.is_empty():
+            self.get_logger().warn("Loaded PCD is empty, skipping publish")
+            return
+
+        current_stamp = self.get_clock().now().to_msg()
+        msg = o3d_to_ros(o3d_cloud, self.frame_id, stamp=current_stamp)
+
         self.publisher_.publish(msg)
         self.get_logger().info(
             f"Published map point cloud to {self.publish_topic} "
-            f"(frame_id: {self.frame_id}, points: {len(np.asarray(msg.data)//12)})"
+            f"(frame_id: {self.frame_id}, points: {len(o3d_cloud.points)})"
         )
 
 

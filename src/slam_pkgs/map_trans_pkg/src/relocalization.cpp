@@ -57,9 +57,27 @@ public:
         // TF广播器
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-        // 初始化变换矩阵
+        // 初始化变换矩阵为单位矩阵
         T_map_to_odom_ = Eigen::Matrix4d::Identity();
-        RCLCPP_INFO(this->get_logger(), "Relocalization Node Initialized...");
+        initial_pose_received_ = false;  // 初始为 false
+
+        // === 新增：10秒超时自动设置初始位姿为零 ===
+        initial_pose_timer_ = this->create_wall_timer(
+            10s,  // 10秒
+            [this]() {
+                std::lock_guard<std::mutex> lock(pose_mutex_);
+                if (!initial_pose_received_) {
+                    RCLCPP_WARN(this->get_logger(), 
+                        "No initial pose received within 10 seconds, using default pose (0,0,0,0,0,0)");
+                    T_map_to_odom_ = Eigen::Matrix4d::Identity();
+                    initial_pose_received_ = true;  // 标记为已接收（避免重复警告）
+                }
+                // 定时器只触发一次
+                initial_pose_timer_->cancel();
+            });
+
+        RCLCPP_INFO(this->get_logger(), "Relocalization Node Initialized. "
+                    "Will use default zero pose if no /initialpose received in 10s.");
     }
 
     ~RelocalizationNode()
@@ -76,10 +94,20 @@ public:
 
     void start()
     {
-        // 等待地图和初始位姿
-        while (rclcpp::ok() && (!global_map_initialized_ || !initial_pose_received_))
+        // 等待地图（初始位姿现在可以超时自动设置）
+        while (rclcpp::ok() && !global_map_initialized_)
         {
-            RCLCPP_WARN(this->get_logger(), "Waiting for global map and initial pose...");
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                "Waiting for global map on /map3d...");
+            std::this_thread::sleep_for(200ms);
+            rclcpp::spin_some(this->get_node_base_interface());
+        }
+
+        // 等待初始位姿（可能已由定时器设置）
+        while (rclcpp::ok() && !initial_pose_received_)
+        {
+            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                "Waiting for initial pose (or 10s timeout for zero pose)...");
             std::this_thread::sleep_for(200ms);
             rclcpp::spin_some(this->get_node_base_interface());
         }
@@ -156,6 +184,7 @@ private:
             T_map_to_odom_.block<3, 1>(0, 3) = Eigen::Vector3d(origin.x(), origin.y(), origin.z());
 
             initial_pose_received_ = true;
+            initial_pose_timer_->cancel();  // 收到手动位姿，取消超时定时器
             RCLCPP_INFO(this->get_logger(), "Initial pose received.");
         }
         catch (const std::exception &e)
@@ -484,6 +513,9 @@ private:
     bool has_odom_ = false;
     Eigen::Matrix4d T_map_to_odom_;
     bool initial_pose_received_ = false;
+
+    // 新增：初始位姿超时定时器
+    rclcpp::TimerBase::SharedPtr initial_pose_timer_;
 
     // 线程
     std::thread localization_thread_;
