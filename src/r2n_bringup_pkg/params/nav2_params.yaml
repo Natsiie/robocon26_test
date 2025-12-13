@@ -1,9 +1,28 @@
+use_sim_time: false
+
+amcl:
+  ros__parameters:
+    # 可选：如果不启动 amcl，可保留但不影响；或在 launch 中不加载 amcl
+
 bt_navigator:
   ros__parameters:
-    use_sim_time: false
-    global_frame: map
-    robot_base_frame: base_link
-    odom_topic: /odom
+    plugin_lib_names:
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_recovery_actions_bt_node
+      - nav2_pipeline_actions_bt_node
+      - nav2_clear_costmap_service_bt_node
+      - nav2_is_stuck_condition_bt_node
+      - nav2_goal_reached_condition_bt_node
+      - nav2_initial_pose_received_condition_bt_node
+      - nav2_reinitialize_global_localization_service_bt_node
+      - nav2_rate_controller_bt_node
+      - nav2_distance_controller_bt_node
+      - nav2_speed_controller_bt_node
+      - nav2_truncate_path_action_bt_node
+      - nav2_goal_updater_node_bt_node
+    default_nav_to_pose_bt_xml: "$(find-pkg-share nav2_bt_navigator)/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml"
+    default_nav_through_poses_bt_xml: "$(find-pkg-share nav2_bt_navigator)/behavior_trees/navigate_through_poses_w_replanning_and_recovery.xml"
 
 controller_server:
   ros__parameters:
@@ -15,78 +34,89 @@ controller_server:
     controller_plugins: ["FollowPath"]
     FollowPath:
       plugin: "dwb_core::DWBLocalPlanner"
-      xy_goal_tolerance: 0.15
-      yaw_goal_tolerance: 0.15
-      transform_tolerance: 1.0
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25
+      transform_tolerance: 0.2
+      prune_plan: true
+      prune_distance: 1.0
+
+global_costmap:
+  ros__parameters:
+    global_frame: map
+    robot_base_frame: body
+    update_frequency: 5.0
+    publish_frequency: 2.0
+    resolution: 0.05
+    track_unknown_space: true
+    plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+    always_send_full_costmap: true
+
+    static_layer:
+      plugin: "nav2_costmap_2d::StaticLayer"
+      map_subscribe_topic: "/map"
+
+    obstacle_layer:
+      plugin: "nav2_costmap_2d::ObstacleLayer"
+      enabled: true
+      observation_sources: scan
+      scan:
+        topic: /scan
+        max_obstacle_height: 2.0
+        clearing: true
+        marking: true
+        data_type: "LaserScan"
+
+    inflation_layer:
+      plugin: "nav2_costmap_2d::InflationLayer"
+      cost_scaling_factor: 3.0
+      inflation_radius: 0.55
+
+local_costmap:
+  ros__parameters:
+    global_frame: odom
+    robot_base_frame: body
+    rolling_window: true
+    width: 5
+    height: 5
+    resolution: 0.05
+    update_frequency: 10.0
+    publish_frequency: 5.0
+    plugins: ["obstacle_layer", "inflation_layer"]
+
+    obstacle_layer:
+      plugin: "nav2_costmap_2d::ObstacleLayer"
+      enabled: true
+      observation_sources: scan
+      scan:
+        topic: /scan
+        max_obstacle_height: 2.0
+        clearing: true
+        marking: true
+        data_type: "LaserScan"
+
+    inflation_layer:
+      plugin: "nav2_costmap_2d::InflationLayer"
+      cost_scaling_factor: 3.0
+      inflation_radius: 0.55
 
 planner_server:
   ros__parameters:
-    use_sim_time: false
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner"
+      plugin: "nav2_smac_planner/SmacPlannerHybrid"
       tolerance: 0.5
-      use_astar: false
+      downsample_costmap: false
+      downsampling_factor: 1
       allow_unknown: true
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      max_planning_time: 5.0
+      motion_model: "STATE_LATTICE"
 
-local_costmap:
-  local_costmap:
-    ros__parameters:
-      use_sim_time: false
-      global_frame: odom
-      robot_base_frame: base_link
-      rolling_window: true
-      width: 5.0
-      height: 5.0
-      resolution: 0.05
-      update_frequency: 20.0
-      publish_frequency: 10.0
-      robot_radius: 0.3
-      plugins: ["obstacle_layer", "inflation_layer"]
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        observation_sources: scan
-        scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          marking: true
-          clearing: true
-          data_type: "LaserScan"
-      inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.55
-        cost_scaling_factor: 3.0
-
-global_costmap:
-  global_costmap:
-    ros__parameters:
-      use_sim_time: false
-      global_frame: map
-      robot_base_frame: base_link
-      rolling_window: false
-      width: 50.0
-      height: 50.0
-      origin_x: -25.0
-      origin_y: -25.0
-      resolution: 0.05
-      update_frequency: 5.0
-      publish_frequency: 5.0
-      robot_radius: 0.3
-      plugins: ["obstacle_layer", "inflation_layer"]
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        observation_sources: scan
-        scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          marking: true
-          clearing: true
-          data_type: "LaserScan"
-      inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.55
-        cost_scaling_factor: 3.0
-
-behavior_server:
+recovery_server:
   ros__parameters:
-    costmap_topic: local_costmap/costmap_raw
+    recovery_plugins: ["spin", "wait"]
+    spin:
+      plugin: "nav2_recoveries/Spin" # Humble+ 用 nav2_recoveries::Spin
+    wait:
+      plugin: "nav2_recoveries/Wait"

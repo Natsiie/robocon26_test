@@ -142,13 +142,6 @@ install(PROGRAMS
   RENAME pcd_publisher_node
 )
 
-install(PROGRAMS
-  map_trans_pkg/save_pcd.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME save_pcd
-)
-
-
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()

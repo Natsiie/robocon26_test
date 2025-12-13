@@ -9,27 +9,25 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 def generate_launch_description():
     r2n_bringup_pkg_share = get_package_share_directory("r2n_bringup_pkg")
     pcd_file_path = os.path.join(r2n_bringup_pkg_share, "pcds", "test.pcd")
-    
+
     # Get package directories for the additional launch files
-    fast_lio_pkg_dir = get_package_share_directory('fast_lio')
-    livox_driver_pkg_dir = get_package_share_directory('livox_ros_driver2')
-    
+    fast_lio_pkg_dir = get_package_share_directory("fast_lio")
+    livox_driver_pkg_dir = get_package_share_directory("livox_ros_driver2")
+
     return LaunchDescription(
         [
             # Include Fast-LIO mapping launch file
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
-                    os.path.join(fast_lio_pkg_dir, 'launch', 'mapping.launch.py')
+                    os.path.join(fast_lio_pkg_dir, "launch", "mapping.launch.py")
                 )
             ),
-            
             # Include Livox ROS Driver2 Mid360 launch file
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
-                    os.path.join(livox_driver_pkg_dir, 'launch_ROS2', 'msg_MID360_launch.py')
+                    os.path.join(livox_driver_pkg_dir, "launch", "msg_MID360_launch.py")
                 )
             ),
-            
             # Relocalization node
             Node(
                 package="map_trans_pkg",
@@ -37,7 +35,6 @@ def generate_launch_description():
                 name="relocalization_node",
                 output="screen",
             ),
-            
             # PCD publisher node
             Node(
                 package="map_trans_pkg",
@@ -52,6 +49,6 @@ def generate_launch_description():
                         "publish_interval": 20.0,
                     }
                 ],
-            )
+            ),
         ]
     )
