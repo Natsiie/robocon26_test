@@ -28,14 +28,5 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
-
-# 安装Python模块
-ament_python_install_package(${PROJECT_NAME})
-
-install(PROGRAMS
-  r2n_bringup_pkg/sim_odom_publisher.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME sim_odom_publisher
-)
 # Export dependencies
 ament_package()
