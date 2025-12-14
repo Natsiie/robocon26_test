@@ -9,7 +9,7 @@
 
 ## 快速开始
 ### 下载和编译项目
-1. 下载项目 `git clone https://github.com/CeasarSmj/nav2_ros_ws.git`
+1. 下载项目 `git clone https://gitee.com/CeasarSmj/nav_ros2_ws`
 2. 安装依赖项 `bash dependency_install.bash`
 3. 编译项目 `bash compile.bash`，可能会出现 fast_lio 中有 std_err ，可以无视，再运行一次编辑即可
 
