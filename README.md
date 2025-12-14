@@ -24,21 +24,21 @@
 1. 再运行一次 `bash compile.bash`
 2. 加载环境`. install/setup.bash`
 3. 启动slam`ros2 launch map_trans_toolkit slam.launch.py`
-4. 控制 雷达/机器人 移动建图，完成后打开 rqt , 在菜单栏中选择 servive/service_caller ，call 一下 /map_save 即可
+4. 控制 雷达/机器人 移动建图，完成后打开 rqt , 在菜单栏中选择 servive/service_caller ，call 一下 /save_map 即可
 5. 把保存在工作空间目录下的 test.pcd 移动到 r2n_bringup_pkg/pcds 目录下
 6. 运行 map_trans_pkg/scripts/pcd2pgm_simplify.py
 
 ### 运行规划
 1. 再运行步一次 `bash compile.bash`
 2. 加载环境`. install/setup.bash`
-3. 运行 `ros2 launch r2n_bringup_pkg nav2.launch.py`
+3. 运行 `ros2 launch r2n_bringup_pkg nav.launch.py`
 4. 在 rviz 中给定目标点，查看是否给出了路径
 5. 查看 /cmd_vel 中是否有数据，`ros2 topic echo /cmd_vel`
 
 ### CAN 通信部分适配
 1. 调整 can_serial_pkg/include/data_encoder.h 中的结构体以及编码函数为自己的版本，同时下位机也要遵守同样的通信规范
 2. 插入 usb转can 设备，并查看端口号 `ls /dev/ttyUSB*`
-3. 调整运行时的端口号，前往 r2n_bringup_pkg/launch/nav2.launch.py 修改 serial_port
+3. 调整运行时的端口号，前往 r2n_bringup_pkg/launch/nav.launch.py 修改 serial_port
 4. 根据运行规划部分的启动方式启动，给定目标位置，查看机器人是否实现了移动
 
 ## 目录
