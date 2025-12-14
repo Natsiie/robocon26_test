@@ -6,6 +6,7 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <open3d/Open3D.h>
+#include <open3d/io/PointCloudIO.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -14,13 +15,10 @@
 #include <mutex>
 #include <thread>
 #include <chrono>
-#include <open3d/pipelines/registration/Registration.h>
-#include <open3d/pipelines/registration/TransformationEstimation.h>
 using namespace std::chrono_literals;
 
 class RelocalizationNode : public rclcpp::Node
-{
-public:
+{public:
     RelocalizationNode() : Node("relocalization_node")
     {
         // 参数声明
@@ -31,6 +29,7 @@ public:
         this->declare_parameter("fov", 6.28318530718); // 2π
         this->declare_parameter("fov_far", 30.0);
         this->declare_parameter("tf_pub_freq", 50.0);
+        this->declare_parameter("global_map_path", "");  // 新增：全局地图路径
 
         this->get_parameter("map_voxel_size", map_voxel_size_);
         this->get_parameter("scan_voxel_size", scan_voxel_size_);
@@ -40,13 +39,14 @@ public:
         this->get_parameter("fov_far", fov_far_);
         this->get_parameter("tf_pub_freq", tf_pub_freq_);
 
+        std::string global_map_path;
+        this->get_parameter("global_map_path", global_map_path);
+
         // 必要的发布者
         pub_map_to_odom_ = this->create_publisher<nav_msgs::msg::Odometry>("/map_to_odom", 10);
         pub_localization_ = this->create_publisher<nav_msgs::msg::Odometry>("/localization", 10);
 
-        // 订阅者
-        sub_global_map_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/map3d", 10, std::bind(&RelocalizationNode::map_callback, this, std::placeholders::_1));
+        // 订阅者（移除 /map3d，保留 /initialpose）
         sub_initial_pose_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
             "/initialpose", 10, std::bind(&RelocalizationNode::initial_pose_callback, this, std::placeholders::_1));
         sub_scan_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -57,27 +57,25 @@ public:
         // TF广播器
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-        // 初始化变换矩阵为单位矩阵
+        // 直接使用零位姿初始化
         T_map_to_odom_ = Eigen::Matrix4d::Identity();
-        initial_pose_received_ = false;  // 初始为 false
+        initial_pose_received_ = true;  // 视为已初始化
 
-        // === 新增：10秒超时自动设置初始位姿为零 ===
-        initial_pose_timer_ = this->create_wall_timer(
-            10s,  // 10秒
-            [this]() {
-                std::lock_guard<std::mutex> lock(pose_mutex_);
-                if (!initial_pose_received_) {
-                    RCLCPP_WARN(this->get_logger(), 
-                        "No initial pose received within 10 seconds, using default pose (0,0,0,0,0,0)");
-                    T_map_to_odom_ = Eigen::Matrix4d::Identity();
-                    initial_pose_received_ = true;  // 标记为已接收（避免重复警告）
-                }
-                // 定时器只触发一次
-                initial_pose_timer_->cancel();
-            });
+        // 加载全局地图
+        if (global_map_path.empty())
+        {
+            RCLCPP_FATAL(this->get_logger(), "Parameter 'global_map_path' is not set!");
+            return;
+        }
 
-        RCLCPP_INFO(this->get_logger(), "Relocalization Node Initialized. "
-                    "Will use default zero pose if no /initialpose received in 10s.");
+        if (!load_global_map(global_map_path))
+        {
+            RCLCPP_FATAL(this->get_logger(), "Failed to load global map from: %s", global_map_path.c_str());
+            return;
+        }
+
+        RCLCPP_INFO(this->get_logger(), "Relocalization Node Initialized with zero initial pose.");
+        RCLCPP_INFO(this->get_logger(), "Global map loaded from: %s", global_map_path.c_str());
     }
 
     ~RelocalizationNode()
@@ -94,70 +92,44 @@ public:
 
     void start()
     {
-        // 等待地图（初始位姿现在可以超时自动设置）
-        while (rclcpp::ok() && !global_map_initialized_)
-        {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                "Waiting for global map on /map3d...");
-            std::this_thread::sleep_for(200ms);
-            rclcpp::spin_some(this->get_node_base_interface());
-        }
+        // 不再等待地图（已直接加载），也不再等待初始位姿（已设为零）
+        // 只需等待第一次scan和odom即可进行首次定位（可选）
 
-        // 等待初始位姿（可能已由定时器设置）
-        while (rclcpp::ok() && !initial_pose_received_)
-        {
-            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                "Waiting for initial pose (or 10s timeout for zero pose)...");
-            std::this_thread::sleep_for(200ms);
-            rclcpp::spin_some(this->get_node_base_interface());
-        }
-
-        // 首次定位
-        if (cur_scan_ && cur_odom_)
-        {
-            global_localization(T_map_to_odom_);
-        }
-        else
-        {
-            RCLCPP_WARN(this->get_logger(), "First scan or odometry not received!");
-        }
-
-        RCLCPP_INFO(this->get_logger(), "Initialize successfully!");
+        RCLCPP_INFO(this->get_logger(), "Node starting with pre-loaded map and zero initial pose.");
 
         // 启动线程
         localization_thread_ = std::thread(&RelocalizationNode::localization_thread_func, this);
         tf_thread_ = std::thread(&RelocalizationNode::tf_thread_func, this);
+
+        RCLCPP_INFO(this->get_logger(), "Relocalization threads started.");
     }
 
 private:
-    void map_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    bool load_global_map(const std::string& pcd_path)
     {
         std::lock_guard<std::mutex> lock(global_map_mutex_);
         try
         {
-            // 转换ROS2点云到PCL
-            pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-            pcl::fromROSMsg(*msg, *pcl_cloud);
-
-            // 转换PCL到Open3D
             global_map_ = std::make_shared<open3d::geometry::PointCloud>();
-            global_map_->points_.reserve(pcl_cloud->size());
-            for (const auto &point : pcl_cloud->points)
+
+            if (!open3d::io::ReadPointCloud(pcd_path, *global_map_))
             {
-                if (std::isfinite(point.x) && std::isfinite(point.y) && std::isfinite(point.z))
-                {
-                    global_map_->points_.push_back(Eigen::Vector3d(point.x, point.y, point.z));
-                }
+                RCLCPP_ERROR(this->get_logger(), "Failed to read PCD file: %s", pcd_path.c_str());
+                return false;
             }
 
-            // 体素降采样
+            // 过滤无效点并体素降采样
+            global_map_->RemoveNonFinitePoints();
             global_map_ = global_map_->VoxelDownSample(map_voxel_size_);
+
             global_map_initialized_ = true;
-            RCLCPP_INFO(this->get_logger(), "Global map received.");
+            RCLCPP_INFO(this->get_logger(), "Global map loaded and downsampled. Points: %zu", global_map_->points_.size());
+            return true;
         }
         catch (const std::exception &e)
         {
-            RCLCPP_ERROR(this->get_logger(), "Error initializing global map: %s", e.what());
+            RCLCPP_ERROR(this->get_logger(), "Exception while loading map: %s", e.what());
+            return false;
         }
     }
 
@@ -166,30 +138,26 @@ private:
         std::lock_guard<std::mutex> lock(pose_mutex_);
         try
         {
-            // 转换到变换矩阵
             tf2::Transform transform;
             tf2::fromMsg(msg->pose.pose, transform);
+
             T_map_to_odom_ = Eigen::Matrix4d::Identity();
 
-            // 获取旋转矩阵
             tf2::Matrix3x3 basis = transform.getBasis();
             Eigen::Matrix3d rotation_matrix;
             rotation_matrix << basis[0][0], basis[0][1], basis[0][2],
-                basis[1][0], basis[1][1], basis[1][2],
-                basis[2][0], basis[2][1], basis[2][2];
+                               basis[1][0], basis[1][1], basis[1][2],
+                               basis[2][0], basis[2][1], basis[2][2];
             T_map_to_odom_.block<3, 3>(0, 0) = rotation_matrix;
 
-            // 获取平移向量
             tf2::Vector3 origin = transform.getOrigin();
             T_map_to_odom_.block<3, 1>(0, 3) = Eigen::Vector3d(origin.x(), origin.y(), origin.z());
 
-            initial_pose_received_ = true;
-            initial_pose_timer_->cancel();  // 收到手动位姿，取消超时定时器
-            RCLCPP_INFO(this->get_logger(), "Initial pose received.");
+            RCLCPP_INFO(this->get_logger(), "Initial pose updated manually via /initialpose.");
         }
         catch (const std::exception &e)
         {
-            RCLCPP_ERROR(this->get_logger(), "Error receiving initial pose: %s", e.what());
+            RCLCPP_ERROR(this->get_logger(), "Error processing initial pose: %s", e.what());
         }
     }
 
@@ -238,7 +206,7 @@ private:
             return false;
         }
 
-        RCLCPP_INFO(this->get_logger(), "Global localization by scan-to-map matching...");
+        // RCLCPP_INFO(this->get_logger(), "Global localization by scan-to-map matching...");
         auto start_time = this->now();
 
         try
@@ -256,8 +224,6 @@ private:
 
             auto end_time = this->now();
             auto duration = end_time - start_time;
-            RCLCPP_INFO(this->get_logger(), "Time: %.3f seconds", duration.seconds());
-            RCLCPP_INFO(this->get_logger(), "Fitness score: %.3f", fitness_fine);
 
             // 当全局定位成功时才更新map2odom
             if (fitness_fine > localization_threshold_)
@@ -512,10 +478,7 @@ private:
     nav_msgs::msg::Odometry::SharedPtr cur_odom_;
     bool has_odom_ = false;
     Eigen::Matrix4d T_map_to_odom_;
-    bool initial_pose_received_ = false;
-
-    // 新增：初始位姿超时定时器
-    rclcpp::TimerBase::SharedPtr initial_pose_timer_;
+    bool initial_pose_received_ = false;  // 现在启动时设为 true
 
     // 线程
     std::thread localization_thread_;
@@ -533,7 +496,6 @@ private:
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_map_to_odom_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_localization_;
 
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_global_map_;
     rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr sub_initial_pose_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_scan_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odom_;

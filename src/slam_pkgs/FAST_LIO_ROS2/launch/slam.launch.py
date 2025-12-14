@@ -62,7 +62,7 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(
                     os.path.join(livox_driver_pkg_dir, "launch", "msg_MID360_launch.py")
                 )
-            ),
+            )
     
 
     ld = LaunchDescription()

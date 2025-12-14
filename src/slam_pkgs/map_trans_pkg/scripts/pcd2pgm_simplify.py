@@ -49,8 +49,8 @@ def pcd_to_pgm(
     print(f"Map size: {width}x{height} @ {resolution}m/pixel")
     print(f"Origin: ({x_min:.3f}, {y_min:.3f})")
 
-    # 4. Create empty grid: 255 = free, 0 = occupied, 127 = unknown (initially all unknown)
-    grid = np.full((height, width), 127, dtype=np.uint8)  # unknown
+    # 4. Create empty grid
+    grid = np.full((height, width), 255, dtype=np.uint8)  # unknown
 
     # 5. Compute grid indices
     ix = np.floor((points[:, 0] - x_min) / resolution).astype(int)

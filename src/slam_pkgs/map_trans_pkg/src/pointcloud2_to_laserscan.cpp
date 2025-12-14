@@ -6,11 +6,11 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/passthrough.h>
-
+#include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.hpp>
-
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <memory>
 #include <vector>
 #include <cmath>
@@ -23,9 +23,10 @@ public:
         // 参数
         declare_parameter("pc_topic", "/livox/lidar_pc2");
         declare_parameter("laserscan_topic", "/scan");
-        declare_parameter("lidar_frame", "livox_frame");
-        declare_parameter("base_frame", "body");
-        declare_parameter("output_frame", "body");
+        declare_parameter("lidar_frame", "body");           // lidar frame (usually fixed to body)
+        declare_parameter("base_frame", "body");            // body frame
+        declare_parameter("stable_frame", "map");           // or "odom" – the frame assumed horizontal
+        declare_parameter("output_frame", "body_2d");
         declare_parameter("min_height", -0.2);
         declare_parameter("max_height", 0.2);
         declare_parameter("min_range", 0.1);
@@ -37,10 +38,11 @@ public:
 
         // 获取参数
         pc_topic_ = get_parameter("pc_topic").as_string();
+        laserscan_topic_ = get_parameter("laserscan_topic").as_string();
         lidar_frame_ = get_parameter("lidar_frame").as_string();
         base_frame_ = get_parameter("base_frame").as_string();
+        stable_frame_ = get_parameter("stable_frame").as_string();
         output_frame_ = get_parameter("output_frame").as_string();
-
         min_height_ = get_parameter("min_height").as_double();
         max_height_ = get_parameter("max_height").as_double();
         min_range_ = get_parameter("min_range").as_double();
@@ -59,88 +61,135 @@ public:
         // TF
         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+        tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-        // 订阅发布
-        sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
+        // 订阅点云
+        pc_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
             pc_topic_, 10,
-            std::bind(&PointCloudToLaserScanForBody::callback, this, std::placeholders::_1));
+            std::bind(&PointCloudToLaserScanForBody::pc_callback, this, std::placeholders::_1));
 
-        pub_ = create_publisher<sensor_msgs::msg::LaserScan>("/scan", 10);
+        // 发布 LaserScan
+        scan_pub_ = create_publisher<sensor_msgs::msg::LaserScan>(laserscan_topic_, 10);
 
-        RCLCPP_INFO(this->get_logger(),
-                    "Converting pointcloud from [%s] → project in [%s] → publish as frame_id=[%s]",
-                    lidar_frame_.c_str(), base_frame_.c_str(), output_frame_.c_str());
+        // 定时发布 body → body_2d 变换（10 Hz）
+        timer_ = create_wall_timer(
+            std::chrono::milliseconds(100),
+            std::bind(&PointCloudToLaserScanForBody::publish_level_transform, this));
+
+        RCLCPP_INFO(this->get_logger(), "Node initialized. Using %s → %s to level the frame %s",
+                    stable_frame_.c_str(), base_frame_.c_str(), output_frame_.c_str());
     }
 
 private:
-    void callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    void publish_level_transform()
     {
-        if (msg->header.frame_id != lidar_frame_)
-        {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *get_clock(), 5000,
-                                 "Expected frame %s, got %s", lidar_frame_.c_str(), msg->header.frame_id.c_str());
+        geometry_msgs::msg::TransformStamped tf_stamped;
+        try {
+            // Use latest available transform 
+            tf_stamped = tf_buffer_->lookupTransform(stable_frame_, base_frame_ , rclcpp::Time(0));
+        } catch (tf2::TransformException &ex) {
+            return;  // No transform yet, skip broadcasting
         }
 
-        geometry_msgs::msg::TransformStamped transform;
-        try
-        {
-            transform = tf_buffer_->lookupTransform(
-                base_frame_,          // target
-                msg->header.frame_id, // source (通常是 robot_lidar)
-                msg->header.stamp,    // 用点云时间戳更准
-                rclcpp::Duration::from_seconds(0.1));
+        // Extract full RPY from stable_frame → body (map/odom → body)
+        tf2::Quaternion q;
+        tf2::fromMsg(tf_stamped.transform.rotation, q);
+        tf2::Matrix3x3 m(q);
+        double roll, pitch, yaw;
+        m.getRPY(roll, pitch, yaw);
+
+        // Create leveling rotation: cancel roll and pitch (align Z with gravity)
+        tf2::Quaternion q_level;
+        q_level.setRPY(-roll, -pitch, 0.0);
+
+        // Then apply the projected yaw around the new vertical Z
+        tf2::Quaternion q_yaw;
+        q_yaw.setRPY(0.0, 0.0, yaw);
+
+        tf2::Quaternion q_final = q_yaw * q_level;  // Level first, then yaw
+
+        // Broadcast body → body_2d
+        geometry_msgs::msg::TransformStamped level_tf;
+        level_tf.header.stamp = this->now();
+        level_tf.header.frame_id = base_frame_;      // body
+        level_tf.child_frame_id = output_frame_;     // body_2d
+        level_tf.transform.translation.x = 0.0;
+        level_tf.transform.translation.y = 0.0;
+        level_tf.transform.translation.z = -tf_stamped.transform.translation.z;
+        level_tf.transform.rotation = tf2::toMsg(q_final);
+
+        tf_broadcaster_->sendTransform(level_tf);
+    }
+    // 点云回调
+    void pc_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    {
+        if (msg->header.frame_id != lidar_frame_) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *get_clock(), 5000,
+                                 "Expected pointcloud frame %s, got %s",
+                                 lidar_frame_.c_str(), msg->header.frame_id.c_str());
         }
-        catch (tf2::TransformException &ex)
-        {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *get_clock(), 1000,
-                                 "TF lookup failed (%s → %s): %s",
-                                 msg->header.frame_id.c_str(), base_frame_.c_str(), ex.what());
+
+        // Step 1: lidar → body (通常是固定变换)
+        geometry_msgs::msg::TransformStamped tf_lidar_to_body;
+        try {
+            tf_lidar_to_body = tf_buffer_->lookupTransform(base_frame_, msg->header.frame_id,rclcpp::Time(0));
+        } catch (tf2::TransformException &ex) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *get_clock(), 1000, "TF lidar→body failed: %s", ex.what());
             return;
         }
+        sensor_msgs::msg::PointCloud2 cloud_body;
+        tf2::doTransform(*msg, cloud_body, tf_lidar_to_body);
 
-        // 变换点云到 base_link 坐标系
-        sensor_msgs::msg::PointCloud2 cloud_in_base;
-        tf2::doTransform(*msg, cloud_in_base, transform);
+        // Step 2: body → body_2d
+        geometry_msgs::msg::TransformStamped tf_body_to_2d;
+        try {
+            tf_body_to_2d = tf_buffer_->lookupTransform(output_frame_, base_frame_,rclcpp::Time(0));
+        } catch (tf2::TransformException &ex) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *get_clock(), 1000,
+                                 "TF body -> body_2d not available yet: %s", ex.what());
+            return;
+        }
+        sensor_msgs::msg::PointCloud2 cloud_2d;
+        tf2::doTransform(cloud_body, cloud_2d, tf_body_to_2d);
 
-        // 转为 PCL
-        pcl::PointCloud<pcl::PointXYZ> cloud;
-        pcl::fromROSMsg(cloud_in_base, cloud);
+        // Step 3: PCL 高度过滤
+        pcl::PointCloud<pcl::PointXYZ> cloud_pcl;
+        pcl::fromROSMsg(cloud_2d, cloud_pcl);
 
-        // 高度过滤
         pcl::PointCloud<pcl::PointXYZ>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PassThrough<pcl::PointXYZ> pass;
-        pass.setInputCloud(cloud.makeShared());
+        pass.setInputCloud(cloud_pcl.makeShared());
         pass.setFilterFieldName("z");
         pass.setFilterLimits(min_height_, max_height_);
         pass.filter(*filtered);
 
-        // 投影到极坐标，取最近点
+        // Step 4: 投影到 LaserScan
         std::vector<float> ranges(num_readings_, std::numeric_limits<float>::infinity());
 
-        for (const auto &p : filtered->points)
-        {
+        for (const auto &p : filtered->points) {
+            if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) continue;
+
             float range = std::hypot(p.x, p.y);
-            if (range < min_range_ || range > max_range_)
-                continue;
+            if (range < min_range_ || range > max_range_) continue;
 
             float angle = std::atan2(p.y, p.x);
-            if (angle < angle_min_)
-                angle += 2 * M_PI;
-            if (angle > angle_max_)
-                angle -= 2 * M_PI;
-            if (angle < angle_min_ || angle > angle_max_)
-                continue;
 
-            int idx = static_cast<int>((angle - angle_min_) / angle_inc_);
-            if (idx >= 0 && idx < num_readings_ && range < ranges[idx])
-            {
+            // 归一化角度到 [angle_min, angle_max]
+            while (angle < angle_min_) angle += 2 * M_PI;
+            while (angle > angle_max_) angle -= 2 * M_PI;
+            if (angle < angle_min_ || angle > angle_max_) continue;
+
+            int idx = static_cast<int>(std::round((angle - angle_min_) / angle_inc_));
+            if (idx < 0 || idx >= num_readings_) continue;
+
+            if (range < ranges[idx]) {
                 ranges[idx] = range;
             }
         }
 
-        // 发布：frame_id 强制为 body
+        // Step 5: 发布
         auto scan = std::make_unique<sensor_msgs::msg::LaserScan>();
-        scan->header.stamp = transform.header.stamp;
+        scan->header.stamp = msg->header.stamp;
         scan->header.frame_id = output_frame_;
         scan->angle_min = angle_min_;
         scan->angle_max = angle_max_;
@@ -149,24 +198,24 @@ private:
         scan->range_min = min_range_;
         scan->range_max = max_range_;
         scan->ranges = ranges;
-        scan->intensities.assign(num_readings_, 0.0f);
+        scan->intensities.resize(num_readings_, 0.0f);
 
-        pub_->publish(std::move(scan));
+        scan_pub_->publish(std::move(scan));
     }
 
-    // ROS
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_;
-    rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub_;
-
-    // TF
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-
-    // 参数
-    std::string pc_topic_, lidar_frame_, base_frame_, output_frame_;
+    // 成员变量
+    std::string pc_topic_, laserscan_topic_, lidar_frame_, base_frame_, stable_frame_, output_frame_;
     double min_height_, max_height_, min_range_, max_range_, scan_time_;
     double angle_min_, angle_max_, angle_inc_;
     int num_readings_;
+
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pc_sub_;
+    rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan_pub_;
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 };
 
 int main(int argc, char **argv)

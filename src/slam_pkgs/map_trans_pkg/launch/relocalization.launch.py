@@ -10,7 +10,7 @@ def generate_launch_description():
     r2n_bringup_pkg_share = get_package_share_directory("r2n_bringup_pkg")
     pcd_file_path = os.path.join(r2n_bringup_pkg_share, "pcds", "test.pcd")
 
-    # Get package directories for the additional launch files
+    # Get package directories
     fast_lio_pkg_dir = get_package_share_directory("fast_lio")
     livox_driver_pkg_dir = get_package_share_directory("livox_ros_driver2")
 
@@ -28,25 +28,22 @@ def generate_launch_description():
                     os.path.join(livox_driver_pkg_dir, "launch", "msg_MID360_launch.py")
                 )
             ),
-            # Relocalization node
+            # Relocalization node — now loads map internally
             Node(
                 package="map_trans_pkg",
                 executable="relocalization_node",
                 name="relocalization_node",
                 output="screen",
-            ),
-            # PCD publisher node
-            Node(
-                package="map_trans_pkg",
-                executable="pcd_publisher_node",  # python 节点编译后通常为此名（或 pcd_publisher_node）
-                name="pcd_publisher",
-                output="screen",
                 parameters=[
                     {
-                        "pcd_path": pcd_file_path,
-                        "publish_topic": "/map3d",  # 关键：改为 relocalization_node 订阅的 /map3d
-                        "frame_id": "map",
-                        "publish_interval": 20.0,
+                        "global_map_path": pcd_file_path,   # 直接传给节点
+                        "map_voxel_size": 0.3,
+                        "scan_voxel_size": 0.1,
+                        "localization_freq": 1.0,
+                        "localization_threshold": 0.8,
+                        "fov": 6.28318530718,
+                        "fov_far": 30.0,
+                        "tf_pub_freq": 50.0,
                     }
                 ],
             ),
