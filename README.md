@@ -23,7 +23,7 @@
 ### 扫图
 1. 再运行一次 `bash compile.bash`
 2. 加载环境`. install/setup.bash`
-3. 启动slam`ros2 launch map_trans_toolkit slam.launch.py`
+3. 启动slam`ros2 launch fast_lio slam.launch.py`
 4. 控制 雷达/机器人 移动建图，完成后打开 rqt , 在菜单栏中选择 servive/service_caller ，call 一下 /save_map 即可
 5. 把保存在工作空间目录下的 test.pcd 移动到 r2n_bringup_pkg/pcds 目录下
 6. 运行 map_trans_pkg/scripts/pcd2pgm_simplify.py
