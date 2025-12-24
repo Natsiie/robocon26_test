@@ -43,8 +43,8 @@ private:
         
         // 创建CAN消息
         auto can_frame_msg = can_msgs::msg::Frame();
-        can_frame_msg.id = 0x200;  // 根据实际需求设置合适的CAN ID
-        can_frame_msg.dlc = 8;     // 数据长度
+        can_frame_msg.id = 5;  
+        can_frame_msg.dlc = 8;
         
         // 将编码后的数据填充到CAN消息中
         // 注意：这里按照结构体内存布局进行复制

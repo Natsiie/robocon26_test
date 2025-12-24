@@ -109,6 +109,7 @@ private:
         memcpy(send_frame.data, msg->data.data(), CAN_DATA_IN_BYTE);
 
         encode_can_frame(&send_frame, send_data);
+        RCLCPP_INFO(this->get_logger(),"send data : %s", hex2str_c(send_data));
 
         int written = sp_blocking_write(port_, send_data, CAN_LEN_IN_BYTE, 200); // 200ms超时
         if (written != CAN_LEN_IN_BYTE)
@@ -144,11 +145,15 @@ private:
                 continue;
             }
 
+
             if (buffer[CAN_LEN_IN_BYTE - 1] != CAN_TAIL)
             {
-                RCLCPP_WARN(this->get_logger(), "Invalid frame tail: 0x%02X", buffer[CAN_LEN_IN_BYTE - 1]);
+                RCLCPP_WARN(this->get_logger(), "Invalid frame tail at recv: 0x%02X", buffer[CAN_LEN_IN_BYTE - 1]);
                 continue;
             }
+            
+
+            // RCLCPP_INFO(this->get_logger(),"recv data : %s", hex2str_c(buffer));
 
             // 解码并发布
             can_frame recv_frame;
@@ -162,6 +167,19 @@ private:
 
             can_pub_->publish(frame_msg);
         }
+    }
+
+    const char* hex2str_c(const uint8_t* data, size_t len = CAN_LEN_IN_BYTE)
+    {
+        thread_local static char buf[256]; 
+        char* p = buf;
+        for (size_t i = 0; i < len; ++i)
+        {
+            if (i > 0) *p++ = ' ';
+            p += sprintf(p, "%02X", data[i]);
+        }
+        *p = '\0';
+        return buf;
     }
 
     // 成员变量
