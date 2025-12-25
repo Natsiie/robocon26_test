@@ -104,7 +104,7 @@ class Lddc final {
   void PublishCustomPointcloud(LidarDataQueue *queue, uint8_t index);
   void PublishPclMsg(LidarDataQueue *queue, uint8_t index);
 
-  void PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index);
+  void PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, LidarDevice *lidar);
 
   void InitPointcloud2MsgHeader(PointCloud2& cloud);
   void InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp);
@@ -118,7 +118,7 @@ class Lddc final {
   void FillPointsToPclMsg(const StoragePacket& pkg, PointCloud& pcl_msg);
   void PublishPclData(const uint8_t index, const uint64_t timestamp, const PointCloud& cloud);
 
-  void InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timestamp);
+  void InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timestamp, LidarDevice *lidar);
 
   void FillPointsToPclMsg(PointCloud& pcl_msg, LivoxPointXyzrtlt* src_point, uint32_t num);
   void FillPointsToCustomMsg(CustomMsg& livox_msg, LivoxPointXyzrtlt* src_point, uint32_t num,

@@ -99,8 +99,8 @@ if __name__ == "__main__":
     os.makedirs(os.path.dirname(pgm_file), exist_ok=True)
 
     # Height range to keep (ground level, avoid ceiling/floor noise)
-    Z_MIN = 0.1   # meters above sensor/ground
-    Z_MAX = 0.5   # meters
+    Z_MIN = 0.1  # meters above sensor/ground
+    Z_MAX = 2.0   # meters
 
     # Grid resolution (common: 0.05m = 5cm)
     RESOLUTION = 0.05

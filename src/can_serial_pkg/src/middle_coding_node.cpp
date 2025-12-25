@@ -29,13 +29,10 @@ private:
         // 从Twist消息填充底盘数据
         raw_data.chassis_x = static_cast<float>(msg->linear.x); // x方向线速度
         raw_data.chassis_y = static_cast<float>(msg->linear.y); // y方向线速度
-        raw_data.chassis_yaw = 0.0;
-        if (ENABLE_ROTATION)                                    // z方向角速度（yaw），作用到云台上
-            raw_data.gimbal_delta_yaw = static_cast<float>(msg->angular.z);
-        else
-            raw_data.gimbal_delta_yaw = 0.0f;
+        raw_data.chassis_yaw = 1.0f;
+        raw_data.gimbal_delta_yaw = static_cast<float>(msg->angular.z);
 
-        // 初始化云台数据为0（如果需要从其他来源获取云台数据，可以在这里更新）
+        // 初始化云台数据为0
         raw_data.gimbal_delta_pitch = 0.0f;
         raw_data.gimbal_shoot = 0;
         raw_data.gimbal_found = 0;

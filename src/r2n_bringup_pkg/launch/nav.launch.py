@@ -88,9 +88,9 @@ def generate_launch_description():
                         "pc_topic": "/cloud_registered_body",
                         "laserscan_topic": "/scan",
                         "output_frame": "body_2d",
-                        "min_height": -0.2,
-                        "max_height": 0.2,
-                        "min_dist": 0.1,
+                        "min_height": 0.2,
+                        "max_height": 1.0,
+                        "min_dist": 0.4,
                         "max_dist": 10.0,
                         "angle_resolution_deg": 1.0,
                         "angle_min_deg": -180.0,
@@ -138,7 +138,7 @@ def generate_launch_description():
                 package="can_serial_pkg",          # Same package as above
                 executable="middle_coding_node",
                 name="middle_coding_node",
-                output="screen",
+                # output="screen",
                 # No parameters needed — topics are hardcoded in the node
             ),
             # === RViz ===

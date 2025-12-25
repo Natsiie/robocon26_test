@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-#define ENABLE_ROTATION 1
 #define CAN_FRAME_ID 5
 #define INT14_MAX (0x1FFF)
 

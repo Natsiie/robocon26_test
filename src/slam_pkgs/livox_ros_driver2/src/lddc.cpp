@@ -31,6 +31,7 @@
 #include <iostream>
 #include <iomanip>
 #include <math.h>
+#include <cmath>
 #include <stdint.h>
 
 #include "include/ros_headers.h"
@@ -180,7 +181,7 @@ void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
 void Lddc::PollingLidarImuData(uint8_t index, LidarDevice *lidar) {
   LidarImuDataQueue& p_queue = lidar->imu_data;
   while (!lds_->IsRequestExit() && !p_queue.Empty()) {
-    PublishImuData(p_queue, index);
+    PublishImuData(p_queue, index, lidar);
   }
 }
 
@@ -478,7 +479,7 @@ void Lddc::PublishPclData(const uint8_t index, const uint64_t timestamp, const P
   return;
 }
 
-void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timestamp) {
+void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timestamp, LidarDevice *lidar) {
   imu_msg.header.frame_id = "livox_frame";
 
   timestamp = imu_data.time_stamp;
@@ -488,15 +489,78 @@ void Lddc::InitImuMsg(const ImuData& imu_data, ImuMsg& imu_msg, uint64_t& timest
   imu_msg.header.stamp = rclcpp::Time(timestamp);  // to ros time stamp
 #endif
 
-  imu_msg.angular_velocity.x = imu_data.gyro_x;
-  imu_msg.angular_velocity.y = imu_data.gyro_y;
-  imu_msg.angular_velocity.z = imu_data.gyro_z;
-  imu_msg.linear_acceleration.x = imu_data.acc_x;
-  imu_msg.linear_acceleration.y = imu_data.acc_y;
-  imu_msg.linear_acceleration.z = imu_data.acc_z;
+  // Get extrinsic parameters
+  ExtParameter& extrinsic = lidar->livox_config.extrinsic_param;
+  
+  // Convert extrinsic angles from degrees to radians
+  double roll_rad = extrinsic.roll * M_PI / 180.0;
+  double pitch_rad = extrinsic.pitch * M_PI / 180.0;
+  double yaw_rad = extrinsic.yaw * M_PI / 180.0;
+  
+  // Compute rotation matrix (body to sensor)
+  double cos_roll = cos(roll_rad);
+  double sin_roll = sin(roll_rad);
+  double cos_pitch = cos(pitch_rad);
+  double sin_pitch = sin(pitch_rad);
+  double cos_yaw = cos(yaw_rad);
+  double sin_yaw = sin(yaw_rad);
+  
+  double R[3][3] = {
+    {cos_pitch * cos_yaw, cos_pitch * sin_yaw, -sin_pitch},
+    {sin_roll * sin_pitch * cos_yaw - cos_roll * sin_yaw, sin_roll * sin_pitch * sin_yaw + cos_roll * cos_yaw, sin_roll * cos_pitch},
+    {cos_roll * sin_pitch * cos_yaw + sin_roll * sin_yaw, cos_roll * sin_pitch * sin_yaw - sin_roll * cos_yaw, cos_roll * cos_pitch}
+  };
+  
+  // Position vector in mm, convert to m
+  double r[3] = {extrinsic.x / 1000.0, extrinsic.y / 1000.0, extrinsic.z / 1000.0};
+  
+  // Angular velocity in sensor frame (rad/s)
+  double gyro_sensor[3] = {imu_data.gyro_x, imu_data.gyro_y, imu_data.gyro_z};
+  
+  // Transform angular velocity: ω_body = R * ω_sensor
+  double gyro_body[3];
+  for (int i = 0; i < 3; i++) {
+    gyro_body[i] = 0;
+    for (int j = 0; j < 3; j++) {
+      gyro_body[i] += R[i][j] * gyro_sensor[j];
+    }
+  }
+  
+  // Linear acceleration in sensor frame (convert from g to m/s²)
+  double acc_sensor[3] = {imu_data.acc_x * 9.80665, imu_data.acc_y * 9.80665, imu_data.acc_z * 9.80665};
+  
+  // Compute centrifugal acceleration: ω × (ω × r)
+  double omega_cross_omega_cross_r[3];
+  // ω × r
+  double omega_cross_r[3] = {
+    gyro_sensor[1] * r[2] - gyro_sensor[2] * r[1],
+    gyro_sensor[2] * r[0] - gyro_sensor[0] * r[2],
+    gyro_sensor[0] * r[1] - gyro_sensor[1] * r[0]
+  };
+  // ω × (ω × r)
+  omega_cross_omega_cross_r[0] = gyro_sensor[1] * omega_cross_r[2] - gyro_sensor[2] * omega_cross_r[1];
+  omega_cross_omega_cross_r[1] = gyro_sensor[2] * omega_cross_r[0] - gyro_sensor[0] * omega_cross_r[2];
+  omega_cross_omega_cross_r[2] = gyro_sensor[0] * omega_cross_r[1] - gyro_sensor[1] * omega_cross_r[0];
+  
+  // Transform linear acceleration: a_body = R * a_sensor + ω × (ω × r)
+  double acc_body[3];
+  for (int i = 0; i < 3; i++) {
+    acc_body[i] = omega_cross_omega_cross_r[i];
+    for (int j = 0; j < 3; j++) {
+      acc_body[i] += R[i][j] * acc_sensor[j];
+    }
+  }
+  
+  // Set transformed values
+  imu_msg.angular_velocity.x = gyro_body[0];
+  imu_msg.angular_velocity.y = gyro_body[1];
+  imu_msg.angular_velocity.z = gyro_body[2];
+  imu_msg.linear_acceleration.x = acc_body[0];
+  imu_msg.linear_acceleration.y = acc_body[1];
+  imu_msg.linear_acceleration.z = acc_body[2];
 }
 
-void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index) {
+void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index, LidarDevice *lidar) {
   ImuData imu_data;
   if (!imu_data_queue.Pop(imu_data)) {
     //printf("Publish imu data failed, imu data queue pop failed.\n");
@@ -505,7 +569,7 @@ void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index
 
   ImuMsg imu_msg;
   uint64_t timestamp;
-  InitImuMsg(imu_data, imu_msg, timestamp);
+  InitImuMsg(imu_data, imu_msg, timestamp, lidar);
 
 #ifdef BUILDING_ROS1
   PublisherPtr publisher_ptr = GetCurrentImuPublisher(index);
