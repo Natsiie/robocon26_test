@@ -1,0 +1,150 @@
+controller_server:
+  ros__parameters:
+    use_sim_time: false
+    controller_frequency: 20.0
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    controller_plugins: ["FollowPath"]
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: false
+      prune_plan: true
+      prune_distance: 1.5
+      transform_tolerance: 1.0
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 3.14 # 大幅增加，使控制器忽略最终朝向（相当于不强制旋转到位）
+
+      critics: ["ObstacleFootprint", "PathAlign", "PathDist", "GoalDist"] # 移除 "RotateToGoal" 和 "GoalAlign"，避免任何与朝向相关的评分
+
+      ObstacleFootprint:
+        enabled: true
+        footprint: "[[-0.2, -0.2], [-0.2, 0.2], [0.2, 0.2], [0.2, -0.2]]"
+        cost_scaling_factor: 10.0
+        inflation_radius: 0.55
+      PathAlign:
+        enabled: true
+      PathDist:
+        enabled: true
+      GoalDist:
+        enabled: true
+
+      vx_samples: 20
+      vy_samples: 5 # 保留少量采样以支持横向平移
+      vth_samples: 1 # 设置为1，只采样 theta=0，避免生成旋转轨迹
+      max_vel_x: 0.5
+      min_vel_x: -0.3
+      max_vel_y: 0.5 # 允许y方向平移
+      min_vel_y: -0.5
+      max_vel_theta: 0.0 # 关键：最大角速度设为0，禁止任何旋转输出
+      min_vel_theta: 0.0
+      acc_lim_x: 1.0
+      acc_lim_y: 1.0 # 允许y方向加速度
+      acc_lim_theta: 0.0 # 禁止角加速度
+      decel_lim_x: -1.0
+      decel_lim_y: -1.0
+      decel_lim_theta: 0.0 # 禁止角减速度
+      sim_time: 1.7
+      sim_granularity: 0.025
+      angular_sim_granularity: 0.025
+
+planner_server:
+  ros__parameters:
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_smac_planner/SmacPlannerHybrid"
+      tolerance: 0.5
+      downsample_costmap: false
+      downsampling_factor: 1
+      allow_unknown: true
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      max_planning_time: 5.0
+      motion_model: "STATE_LATTICE"
+      minimum_turning_radius: 0.3
+      reverse_penalty: 2.0
+      change_penalty: 0.05
+      non_straight_penalty: 1.05
+      cost_penalty: 1.5
+      analytic_expansion_ratio: 3.5
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: false
+    global_frame: map
+    robot_base_frame: body_2d
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      global_frame: map
+      robot_base_frame: body_2d
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      resolution: 0.05
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      always_send_full_costmap: true
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_topic: "/map"
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.55
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      global_frame: camera_init
+      robot_base_frame: body_2d
+      rolling_window: true
+      width: 5
+      height: 5
+      resolution: 0.05
+      update_frequency: 10.0
+      publish_frequency: 5.0
+      plugins: ["obstacle_layer", "inflation_layer"]
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.55
+
+smoother_server:
+  ros__parameters:
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1e-10
+      max_its: 1000
+      do_refinement: true
+
+waypoint_follower:
+  ros__parameters:
+    loop_rate: 20
+    stop_on_failure: false

@@ -138,7 +138,7 @@
   <joint name="yaw_to_lidar_joint" type="fixed">
     <parent link="robot_yaw"/>
     <child link="robot_lidar"/>
-    <origin xyz="0 0.06 0.2" rpy="0 0 0"/> <!-- 连接到yaw轴中央左侧 -->
+    <origin xyz="0 0.06 0.2" rpy="3.1415926 0 1.57079"/> <!-- 连接到yaw轴中央左侧 -->
   </joint>
   
   <!-- 6. 雷达底座 -->

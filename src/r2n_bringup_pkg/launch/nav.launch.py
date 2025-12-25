@@ -17,7 +17,8 @@ def generate_launch_description():
     # Map file paths (centralized here)
     pcd_file_path = os.path.join(nav_pkg_share, "pcds", "test.pcd")      # PCD for relocalization
     map_yaml_file = os.path.join(nav_pkg_share, "maps", "test.yaml")     # YAML + PGM for Nav2
-    nav2_params_file = os.path.join(nav_pkg_share, "params", "nav2_params.yaml")
+    # nav2_params_file = os.path.join(nav_pkg_share, "params", "nav2_params.yaml")
+    nav2_params_file = os.path.join(nav_pkg_share, "params", "nav2_params_without_rotation.yaml")
     rviz_config_path = os.path.join(nav_pkg_share, "rviz", "nav2.rviz")
 
     return LaunchDescription(

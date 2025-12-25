@@ -3,7 +3,10 @@
 
 #include <stdint.h>
 
+#define ENABLE_ROTATION 1
+#define CAN_FRAME_ID 5
 #define INT14_MAX (0x1FFF)
+
 
 // 串口数据帧格式
 typedef struct down_ward_data
