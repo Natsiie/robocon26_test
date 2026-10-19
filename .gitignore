@@ -7,3 +7,22 @@ log
 
 __pycache__
 .vscode
+
+# 数据、模型与调试产物
+rosbag2_*/
+*.db3
+*.mcap
+*.bag
+*.zip
+runs/
+frames_*.gv
+frames_*.pdf
+frame*.jpg
+*.pt
+*.onnx
+*.engine
+
+# 可选第三方源码（体积较大，按需自行 clone）
+src/slam_pkgs/FAST-LIVO2/
+src/slam_pkgs/FAST-Calib-ROS2/
+src/rpg_vikit/

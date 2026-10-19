@@ -28,6 +28,7 @@ find_package(nav_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_eigen REQUIRED)  # <--- [修复] 补上了这个关键依赖
 
 # PCL相关
 find_package(PCL REQUIRED COMPONENTS common io filters)
@@ -115,6 +116,7 @@ ament_target_dependencies(relocalization_node
   tf2_ros
   tf2_sensor_msgs
   tf2_geometry_msgs
+  tf2_eigen  # <--- [修复] 补上了这个关键依赖
 )
 target_include_directories(relocalization_node PRIVATE
   include
@@ -136,15 +138,51 @@ install(PROGRAMS
   RENAME map_publisher_node
 )
 
+# 安装 Python 脚本到 lib/map_trans_pkg 目录下，使其成为可执行节点
+install(PROGRAMS
+  scripts/pose_to_serial.py
+  scripts/transform_fusion.py
+  scripts/global_localization.py  # <--- [新增] 必须加上这一行
+  scripts/publish_initial_pose.py
+  scripts/dbscan_clustering.py
+  scripts/yolo_detector.py       # <--- 添加这一行
+  scripts/cube_locator.py
+  scripts/grid_status_manager.py
+  scripts/StepManage.py
+  scripts/Step_monitor.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 install(PROGRAMS
   map_trans_pkg/pcd_publisher_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME pcd_publisher_node
 )
 
+
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+# planb_node (PointCloudFilter)
+add_executable(planb_node src/planb.cpp)
+ament_target_dependencies(planb_node
+  rclcpp
+  sensor_msgs
+  std_msgs
+  pcl_conversions
+)
+target_link_libraries(planb_node
+  ${PCL_LIBRARIES}
+)
+# 注意：你的 planb.cpp 里没有直接 include OpenCV 或 Open3D，
+# 所以这里只需要链接 PCL 库即可。如果未来加了相关代码，记得在这里补上。
+
+install(TARGETS planb_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 
 ament_package()

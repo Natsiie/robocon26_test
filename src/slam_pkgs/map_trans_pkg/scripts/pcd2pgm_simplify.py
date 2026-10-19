@@ -7,6 +7,7 @@ import os
 import numpy as np
 import open3d as o3d
 import cv2
+from ament_index_python.packages import get_package_share_directory
 
 def pcd_to_pgm(
     pcd_path,
@@ -91,7 +92,7 @@ free_thresh: 0.196
 if __name__ == "__main__":
     # ----------------------- CONFIG -----------------------
     # Adjust these paths and parameters as needed
-    root_dir = os.path.join(os.path.dirname(__file__), "../../../r2n_bringup_pkg")
+    root_dir = get_package_share_directory('r2n_bringup_pkg')
     pcd_file = os.path.join(root_dir, "pcds", "test.pcd")
     pgm_file = os.path.join(root_dir, "maps", "test.pgm")
     yaml_file = os.path.join(root_dir, "maps", "test.yaml")

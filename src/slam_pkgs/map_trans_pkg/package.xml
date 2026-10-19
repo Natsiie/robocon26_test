@@ -20,7 +20,7 @@
   <depend>tf2_ros</depend>
   <depend>tf2_sensor_msgs</depend>
   <depend>tf2_geometry_msgs</depend>
-  
+  <depend>tf2_eigen</depend>
   <!-- PCL 依赖 -->
   <depend>libpcl-all-dev</depend>
   
@@ -30,11 +30,18 @@
   <!-- open3d 依赖 -->
   <depend>open3d</depend>
 
+
+
   <!-- Python 依赖 -->
   <depend>rclpy</depend>
   <exec_depend>python3-pil</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
-  
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+
+  <exec_depend>cv_bridge</exec_depend>
+
+
   <!-- 执行依赖 -->
   <exec_depend>ros2launch</exec_depend>
 
